@@ -1,0 +1,13 @@
+{
+  "08a4fa62924b8abea138e19e96516bc7": {
+    "timestamp": 1772641413.767818,
+    "results": {
+      "agents": {},
+      "summary": {
+        "total_agents": 0
+      }
+    },
+    "deployment_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "context": {}
+  }
+}
