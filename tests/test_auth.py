@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from slack_mcp.auth.models import TokenStatus
-from slack_mcp.auth.token_manager import TokenManager, _load_env
+from slack_mpm.auth.models import TokenStatus
+from slack_mpm.auth.token_manager import TokenManager, _load_env
 
 
 def test_token_manager_no_tokens() -> None:
@@ -93,7 +93,7 @@ def test_signing_secret_and_team_id() -> None:
 
 def test_slack_token_mask() -> None:
     """SlackToken.mask() returns a partially obscured token."""
-    from slack_mcp.auth.models import SlackToken
+    from slack_mpm.auth.models import SlackToken
 
     token = SlackToken(token="xoxb-123456789-abcdefg", token_type="bot")
     masked = token.mask()
@@ -103,7 +103,7 @@ def test_slack_token_mask() -> None:
 
 def test_slack_token_is_bot() -> None:
     """SlackToken correctly identifies bot tokens."""
-    from slack_mcp.auth.models import SlackToken
+    from slack_mpm.auth.models import SlackToken
 
     bot_token = SlackToken(token="xoxb-123", token_type="bot")
     user_token = SlackToken(token="xoxp-123", token_type="user")
@@ -113,7 +113,7 @@ def test_slack_token_is_bot() -> None:
 
 def test_slack_token_is_user() -> None:
     """SlackToken correctly identifies user tokens."""
-    from slack_mcp.auth.models import SlackToken
+    from slack_mpm.auth.models import SlackToken
 
     bot_token = SlackToken(token="xoxb-123", token_type="bot")
     user_token = SlackToken(token="xoxp-123", token_type="user")
@@ -141,7 +141,7 @@ def test_load_env_finds_dotenv_local_outside_cwd(
     Path(__file__).parents[3] inside token_manager.py).  The __file__-based
     candidate must fire and load the token.
     """
-    import slack_mcp.auth.token_manager as tm_module
+    import slack_mpm.auth.token_manager as tm_module
 
     # The project root as seen by token_manager.py (4 levels up from the file).
     token_manager_path = Path(tm_module.__file__).resolve()

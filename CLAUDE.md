@@ -3,8 +3,8 @@
 ## What This Is
 Python MCP server + API library for Slack workspace integration.
 Provides:
-1. Clean Python API: `from slack_mcp.api import messages; await messages.send_message(...)`
-2. MCP server: wraps the API for Claude Desktop (`uv run slack-mcp mcp`)
+1. Clean Python API: `from slack_mpm.api import messages; await messages.send_message(...)`
+2. MCP server: wraps the API for Claude Desktop (`uv run slack-mpm mcp`)
 3. Agent scripts: standalone Python scripts in `agents/`
 
 ## Setup
@@ -16,9 +16,9 @@ uv sync
 
 ## Run
 ```bash
-uv run slack-mcp setup    # verify tokens
-uv run slack-mcp doctor   # health check
-uv run slack-mcp mcp      # start MCP server (for Claude Desktop)
+uv run slack-mpm setup    # verify tokens
+uv run slack-mpm doctor   # health check
+uv run slack-mpm mcp      # start MCP server (for Claude Desktop)
 ```
 
 ## Test
@@ -29,7 +29,7 @@ uv run pytest --cov=src --cov-report=html
 
 ## Architecture
 ```
-src/slack_mcp/
+src/slack_mpm/
 ├── api/          # Pure Slack API functions (library layer)
 │   ├── _client.py      # Shared httpx client + SlackAPIError
 │   ├── channels.py     # 8 channel operations
@@ -54,7 +54,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "slack": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/slack-mcp", "slack-mcp", "mcp"]
+      "args": ["run", "--directory", "/path/to/slack-mpm", "slack-mpm", "mcp"]
     }
   }
 }

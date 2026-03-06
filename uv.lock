@@ -1055,8 +1055,8 @@ wheels = [
 ]
 
 [[package]]
-name = "slack-mcp"
-version = "0.1.0"
+name = "slack-mpm"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },

@@ -1,4 +1,4 @@
-"""Version information for slack-mcp."""
+"""Version information for slack-mpm."""
 
 from pathlib import Path
 

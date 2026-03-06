@@ -9,9 +9,9 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from slack_mcp.api import bookmarks, channels, files, messages, reminders, scheduled, users, workspace
-from slack_mcp.api._client import SlackAPIError
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mpm.api import bookmarks, channels, files, messages, reminders, scheduled, users, workspace
+from slack_mpm.api._client import SlackAPIError
+from slack_mpm.auth.token_manager import TokenManager
 
 
 def _pick(args: dict[str, Any], keys: list[str]) -> dict[str, Any]:
@@ -829,7 +829,7 @@ class SlackMCPServer:
 
     def __init__(self) -> None:
         """Initialize the Slack MCP server."""
-        self.server: Server = Server("slack-mcp")
+        self.server: Server = Server("slack-mpm")
         self._token_manager = TokenManager()
         self._setup_handlers()
 

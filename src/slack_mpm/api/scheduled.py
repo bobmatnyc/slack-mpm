@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from slack_mcp.api._client import slack_get, slack_post
+from slack_mpm.api._client import slack_get, slack_post
 
 
 async def schedule_message(

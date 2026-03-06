@@ -5,12 +5,12 @@ import sys
 
 import click
 
-from slack_mcp.__version__ import __version__
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mpm.__version__ import __version__
+from slack_mpm.auth.token_manager import TokenManager
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="slack-mcp")
+@click.version_option(version=__version__, prog_name="slack-mpm")
 def main() -> None:
     """Slack MCP Server - Slack workspace integration via Model Context Protocol."""
 
@@ -75,7 +75,7 @@ def setup() -> None:
     asyncio.run(_validate())
 
     click.echo()
-    click.echo(click.style("Setup complete! Run 'slack-mcp mcp' to start the server.", fg="green"))
+    click.echo(click.style("Setup complete! Run 'slack-mpm mcp' to start the server.", fg="green"))
 
 
 @main.command()
@@ -190,7 +190,7 @@ def mcp_server() -> None:
     """Start the Slack MCP server in stdio mode for use with Claude Desktop."""
     import anyio
 
-    from slack_mcp.server.slack_mcp_server import SlackMCPServer
+    from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
     server = SlackMCPServer()
 

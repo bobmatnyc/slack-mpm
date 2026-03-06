@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "project_name": "slack-mcp",
+  "project_name": "slack-mpm",
   "agents": {
     "enabled": true
   },

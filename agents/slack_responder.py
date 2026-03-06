@@ -22,8 +22,8 @@ from pathlib import Path
 # Allow running as a standalone script from the project root
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from slack_mcp.api import messages, workspace
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mpm.api import messages, workspace
+from slack_mpm.auth.token_manager import TokenManager
 
 
 async def get_bot_user_id(token: str) -> str | None:
@@ -122,7 +122,7 @@ async def monitor_and_respond(
             else:
                 # Monitor DM channels
                 # Get list of DM channels (im type)
-                from slack_mcp.api import channels as ch_api
+                from slack_mpm.api import channels as ch_api
 
                 dm_data = await ch_api.list_channels(token, types="im", exclude_archived=True)
                 dm_channels = dm_data.get("channels", [])

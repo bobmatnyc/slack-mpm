@@ -18,8 +18,8 @@ from pathlib import Path
 # Allow running as a standalone script from the project root
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from slack_mcp.api import files, messages
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mpm.api import files, messages
+from slack_mpm.auth.token_manager import TokenManager
 
 
 async def send_notification(

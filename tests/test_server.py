@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.mark.asyncio
 async def test_server_lists_tools() -> None:
     """Server returns all expected tools."""
-    from slack_mcp.server.slack_mcp_server import SLACK_TOOLS
+    from slack_mpm.server.slack_mcp_server import SLACK_TOOLS
 
     tool_names = [t.name for t in SLACK_TOOLS]
 
@@ -78,7 +78,7 @@ async def test_server_lists_tools() -> None:
 @pytest.mark.asyncio
 async def test_server_tool_count() -> None:
     """Server exposes at least 40 tools."""
-    from slack_mcp.server.slack_mcp_server import SLACK_TOOLS
+    from slack_mpm.server.slack_mcp_server import SLACK_TOOLS
 
     assert len(SLACK_TOOLS) >= 40
 
@@ -87,7 +87,7 @@ async def test_server_tool_count() -> None:
 async def test_dispatch_unknown_tool() -> None:
     """Dispatching unknown tool raises ValueError."""
     with patch.dict("os.environ", {"SLACK_BOT_TOKEN": "xoxb-test"}, clear=True):
-        from slack_mcp.server.slack_mcp_server import SlackMCPServer
+        from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
         server = SlackMCPServer()
         with pytest.raises(ValueError, match="Unknown tool"):
@@ -98,12 +98,12 @@ async def test_dispatch_unknown_tool() -> None:
 async def test_dispatch_list_channels() -> None:
     """list_channels tool dispatches to channels.list_channels."""
     with patch.dict("os.environ", {"SLACK_BOT_TOKEN": "xoxb-test"}, clear=True):
-        from slack_mcp.server.slack_mcp_server import SlackMCPServer
+        from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
         server = SlackMCPServer()
 
         mock_result = {"ok": True, "channels": [{"id": "C123", "name": "general"}]}
-        with patch("slack_mcp.api.channels.list_channels", new=AsyncMock(return_value=mock_result)):
+        with patch("slack_mpm.api.channels.list_channels", new=AsyncMock(return_value=mock_result)):
             result = await server._dispatch_tool("list_channels", {})
             assert result["ok"] is True
             assert len(result["channels"]) == 1
@@ -113,12 +113,12 @@ async def test_dispatch_list_channels() -> None:
 async def test_dispatch_send_message() -> None:
     """send_message tool dispatches to messages.send_message."""
     with patch.dict("os.environ", {"SLACK_BOT_TOKEN": "xoxb-test"}, clear=True):
-        from slack_mcp.server.slack_mcp_server import SlackMCPServer
+        from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
         server = SlackMCPServer()
 
         mock_result = {"ok": True, "ts": "1234567890.123456", "channel": "C123"}
-        with patch("slack_mcp.api.messages.send_message", new=AsyncMock(return_value=mock_result)):
+        with patch("slack_mpm.api.messages.send_message", new=AsyncMock(return_value=mock_result)):
             result = await server._dispatch_tool(
                 "send_message",
                 {"channel": "C123", "text": "Hello!"},
@@ -131,13 +131,13 @@ async def test_dispatch_send_message() -> None:
 async def test_dispatch_get_channel_info() -> None:
     """get_channel_info tool dispatches correctly."""
     with patch.dict("os.environ", {"SLACK_BOT_TOKEN": "xoxb-test"}, clear=True):
-        from slack_mcp.server.slack_mcp_server import SlackMCPServer
+        from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
         server = SlackMCPServer()
 
         mock_result = {"ok": True, "channel": {"id": "C123", "name": "general"}}
         with patch(
-            "slack_mcp.api.channels.get_channel_info", new=AsyncMock(return_value=mock_result)
+            "slack_mpm.api.channels.get_channel_info", new=AsyncMock(return_value=mock_result)
         ):
             result = await server._dispatch_tool("get_channel_info", {"channel": "C123"})
             assert result["ok"] is True
@@ -148,12 +148,12 @@ async def test_dispatch_get_channel_info() -> None:
 async def test_dispatch_list_users() -> None:
     """list_users tool dispatches to users.list_users."""
     with patch.dict("os.environ", {"SLACK_BOT_TOKEN": "xoxb-test"}, clear=True):
-        from slack_mcp.server.slack_mcp_server import SlackMCPServer
+        from slack_mpm.server.slack_mcp_server import SlackMCPServer
 
         server = SlackMCPServer()
 
         mock_result = {"ok": True, "members": [{"id": "U123", "name": "alice"}]}
-        with patch("slack_mcp.api.users.list_users", new=AsyncMock(return_value=mock_result)):
+        with patch("slack_mpm.api.users.list_users", new=AsyncMock(return_value=mock_result)):
             result = await server._dispatch_tool("list_users", {})
             assert result["ok"] is True
             assert len(result["members"]) == 1
@@ -162,7 +162,7 @@ async def test_dispatch_list_users() -> None:
 @pytest.mark.asyncio
 async def test_tool_schemas_have_required_fields() -> None:
     """All tools with required inputs declare them in inputSchema."""
-    from slack_mcp.server.slack_mcp_server import SLACK_TOOLS
+    from slack_mpm.server.slack_mcp_server import SLACK_TOOLS
 
     tools_with_channel = {
         "get_channel_info", "archive_channel", "invite_to_channel",

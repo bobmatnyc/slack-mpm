@@ -1,11 +1,11 @@
-# slack-mcp
+# slack-mpm
 
 A Python MCP (Model Context Protocol) server and API library for Slack workspace integration. Exposes 40+ Slack operations as MCP tools for use with Claude Desktop, and provides a clean async Python API for building Slack integrations.
 
 ## What It Is
 
-- **Python API library**: `from slack_mcp.api import messages; await messages.send_message(...)`
-- **MCP server**: wraps the API for Claude Desktop via `slack-mcp mcp`
+- **Python API library**: `from slack_mpm.api import messages; await messages.send_message(...)`
+- **MCP server**: wraps the API for Claude Desktop via `slack-mpm mcp`
 - **Agent scripts**: standalone automation scripts in `agents/`
 
 ## Prerequisites
@@ -38,13 +38,13 @@ For `search_messages` and reminders, also create a User Token with `search:read`
 
 ```bash
 git clone <repo>
-cd slack-mcp
+cd slack-mpm
 cp .env.local.example .env.local
 # Edit .env.local and add your SLACK_BOT_TOKEN=xoxb-...
 
 uv sync
-uv run slack-mcp setup   # Verify your token works
-uv run slack-mcp doctor  # Health check
+uv run slack-mpm setup   # Verify your token works
+uv run slack-mpm doctor  # Health check
 ```
 
 ## Claude Desktop Configuration
@@ -56,7 +56,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   "mcpServers": {
     "slack": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/slack-mcp", "slack-mcp", "mcp"]
+      "args": ["run", "--directory", "/absolute/path/to/slack-mpm", "slack-mpm", "mcp"]
     }
   }
 }
@@ -155,8 +155,8 @@ Restart Claude Desktop. You should see the Slack tools available.
 
 ```python
 import asyncio
-from slack_mcp.api import messages, channels, users
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mpm.api import messages, channels, users
+from slack_mpm.auth.token_manager import TokenManager
 
 async def main():
     token = TokenManager().get_token()
@@ -251,7 +251,7 @@ uv run ruff format src/ agents/
 ## Project Structure
 
 ```
-src/slack_mcp/
+src/slack_mpm/
 ├── api/
 │   ├── _client.py      # Shared httpx client + SlackAPIError
 │   ├── channels.py     # Channel operations
@@ -268,7 +268,7 @@ src/slack_mcp/
 ├── cli/
 │   └── main.py         # CLI: setup, doctor, mcp commands
 └── server/
-    └── slack_mcp_server.py  # SlackMCPServer (MCP adapter)
+    └── slack_mpm_server.py  # SlackMCPServer (MCP adapter)
 
 agents/
 ├── slack_listener.py   # Channel message poller

@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-from slack_mcp.auth.models import SlackToken, TokenStatus
+from slack_mpm.auth.models import SlackToken, TokenStatus
 
 SLACK_API_BASE = "https://slack.com/api"
 
@@ -22,7 +22,7 @@ def _load_env() -> None:
     2. The project root inferred from this file's location — always resolves to
        the correct directory even when the process CWD is / or ~ (e.g. when
        Claude Desktop launches the MCP server as a GUI app).
-       token_manager.py lives at src/slack_mcp/auth/token_manager.py, so
+       token_manager.py lives at src/slack_mpm/auth/token_manager.py, so
        Path(__file__).resolve().parents[3] is the project root.
     3. Path.home() — machine-wide fallback for users who place .env.local in
        their home directory.
