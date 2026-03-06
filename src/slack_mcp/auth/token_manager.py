@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -15,20 +14,61 @@ SLACK_API_BASE = "https://slack.com/api"
 def _load_env() -> None:
     """Load environment variables from .env and .env.local files.
 
-    Priority: .env loaded first (base), then .env.local overrides.
-    Searches from CWD upward for env files.
+    Searches multiple candidate directories in priority order so that the MCP
+    server finds credentials regardless of the process working directory:
+
+    1. Path.cwd() and each of its parents — preserves CLI / uv-run behaviour
+       where the user invokes the command from inside the project tree.
+    2. The project root inferred from this file's location — always resolves to
+       the correct directory even when the process CWD is / or ~ (e.g. when
+       Claude Desktop launches the MCP server as a GUI app).
+       token_manager.py lives at src/slack_mcp/auth/token_manager.py, so
+       Path(__file__).resolve().parents[3] is the project root.
+    3. Path.home() — machine-wide fallback for users who place .env.local in
+       their home directory.
+
+    For each candidate directory, .env is loaded first (override=False) so
+    existing environment variables take precedence, then .env.local is loaded
+    with override=True so local secrets win over the shared base file.
+
+    Search stops as soon as SLACK_BOT_TOKEN is present in os.environ (the only
+    required credential). SLACK_USER_TOKEN is optional and never blocks early
+    exit. Duplicate candidate paths are skipped automatically.
     """
-    cwd = Path.cwd()
+    # Build the ordered, deduplicated list of candidate directories.
+    candidates: list[Path] = []
+    seen: set[Path] = set()
 
-    # Load base .env (do not override existing env vars)
-    env_path = cwd / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=False)
+    def _add(directory: Path) -> None:
+        resolved = directory.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            candidates.append(resolved)
 
-    # Load .env.local last so it overrides base .env
-    env_local_path = cwd / ".env.local"
-    if env_local_path.exists():
-        load_dotenv(env_local_path, override=True)
+    # 1. CWD and all its parents (walk upward).
+    for ancestor in [Path.cwd(), *Path.cwd().parents]:
+        _add(ancestor)
+
+    # 2. Project root derived from this file's absolute location.
+    _add(Path(__file__).resolve().parents[3])
+
+    # 3. Home directory fallback.
+    _add(Path.home())
+
+    for directory in candidates:
+        # Load base config; do not override vars already set in the environment.
+        env_path = directory / ".env"
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+        # Load local overrides on top of the base config.
+        env_local_path = directory / ".env.local"
+        if env_local_path.exists():
+            load_dotenv(env_local_path, override=True)
+
+        # Stop once the required bot token has been found.
+        if os.environ.get("SLACK_BOT_TOKEN"):
+            break
 
 
 class TokenManager:
@@ -37,28 +77,28 @@ class TokenManager:
     def __init__(self) -> None:
         """Initialize token manager and load tokens from environment."""
         _load_env()
-        self._bot_token: Optional[str] = os.environ.get("SLACK_BOT_TOKEN")
-        self._user_token: Optional[str] = os.environ.get("SLACK_USER_TOKEN")
-        self._signing_secret: Optional[str] = os.environ.get("SLACK_SIGNING_SECRET")
-        self._team_id: Optional[str] = os.environ.get("SLACK_TEAM_ID")
+        self._bot_token: str | None = os.environ.get("SLACK_BOT_TOKEN")
+        self._user_token: str | None = os.environ.get("SLACK_USER_TOKEN")
+        self._signing_secret: str | None = os.environ.get("SLACK_SIGNING_SECRET")
+        self._team_id: str | None = os.environ.get("SLACK_TEAM_ID")
 
     @property
-    def bot_token(self) -> Optional[str]:
+    def bot_token(self) -> str | None:
         """Return the bot token if available."""
         return self._bot_token
 
     @property
-    def user_token(self) -> Optional[str]:
+    def user_token(self) -> str | None:
         """Return the user token if available."""
         return self._user_token
 
     @property
-    def signing_secret(self) -> Optional[str]:
+    def signing_secret(self) -> str | None:
         """Return the signing secret if available."""
         return self._signing_secret
 
     @property
-    def team_id(self) -> Optional[str]:
+    def team_id(self) -> str | None:
         """Return the configured team ID if available."""
         return self._team_id
 
@@ -88,9 +128,7 @@ class TokenManager:
             return self._bot_token
         if self._user_token:
             return self._user_token
-        raise ValueError(
-            "No Slack token configured. Set SLACK_BOT_TOKEN in your .env.local file."
-        )
+        raise ValueError("No Slack token configured. Set SLACK_BOT_TOKEN in your .env.local file.")
 
     async def validate_bot_token(self) -> SlackToken:
         """Validate the bot token by calling auth.test API.
@@ -103,7 +141,7 @@ class TokenManager:
         """
         if not self._bot_token:
             return SlackToken(
-                token="",
+                token="",  # nosec B106 — empty sentinel, not a hardcoded credential
                 token_type="bot",
                 status=TokenStatus.MISSING,
             )
@@ -121,7 +159,7 @@ class TokenManager:
         """
         if not self._user_token:
             return SlackToken(
-                token="",
+                token="",  # nosec B106 — empty sentinel, not a hardcoded credential
                 token_type="user",
                 status=TokenStatus.MISSING,
             )

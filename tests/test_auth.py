@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
+import os
+from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from slack_mcp.auth.models import TokenStatus
-from slack_mcp.auth.token_manager import TokenManager
+from slack_mcp.auth.token_manager import TokenManager, _load_env
 
 
 def test_token_manager_no_tokens() -> None:
@@ -124,3 +127,49 @@ def test_token_status_enum() -> None:
     assert TokenStatus.INVALID == "invalid"
     assert TokenStatus.MISSING == "missing"
     assert TokenStatus.UNKNOWN == "unknown"
+
+
+def test_load_env_finds_dotenv_local_outside_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_load_env() loads .env.local from the project root when CWD has no env
+    files, simulating how Claude Desktop launches the MCP server with CWD set
+    to the home directory or /.
+
+    Strategy: change the real process CWD to tmp_path (empty — no .env files)
+    and place a sentinel .env.local in the project root (resolved via
+    Path(__file__).parents[3] inside token_manager.py).  The __file__-based
+    candidate must fire and load the token.
+    """
+    import slack_mcp.auth.token_manager as tm_module
+
+    # The project root as seen by token_manager.py (4 levels up from the file).
+    token_manager_path = Path(tm_module.__file__).resolve()
+    project_root = token_manager_path.parents[3]
+    env_local = project_root / ".env.local"
+
+    # Preserve any existing .env.local so we don't destroy real credentials.
+    original_content: bytes | None = None
+    if env_local.exists():
+        original_content = env_local.read_bytes()
+
+    try:
+        env_local.write_text("SLACK_BOT_TOKEN=xoxb-from-project-root\n")
+
+        # Actually change the process CWD to an empty temp directory.
+        monkeypatch.chdir(tmp_path)
+
+        # Clear the environment so no pre-existing token interferes.
+        monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+        monkeypatch.delenv("SLACK_USER_TOKEN", raising=False)
+
+        _load_env()
+
+        assert os.environ.get("SLACK_BOT_TOKEN") == "xoxb-from-project-root"
+
+    finally:
+        # Restore original .env.local (or remove the sentinel we created).
+        if original_content is not None:
+            env_local.write_bytes(original_content)
+        else:
+            env_local.unlink(missing_ok=True)
