@@ -167,11 +167,13 @@ build: clean ## Build wheel and sdist
 version: ## Show current version
 	@cat VERSION
 
-sync-versions: ## Sync version from VERSION file into pyproject.toml
+sync-versions: ## Sync version from VERSION file into pyproject.toml and __version__.py
 	@echo "$(YELLOW)Syncing version files...$(NC)"
 	@VERSION=$$(cat VERSION); \
 	sed -i '' "s/^version = \"[^\"]*\"/version = \"$$VERSION\"/" pyproject.toml 2>/dev/null || \
 	sed -i  "s/^version = \"[^\"]*\"/version = \"$$VERSION\"/" pyproject.toml; \
+	sed -i '' "s/^__version__ = \"[^\"]*\"/__version__ = \"$$VERSION\"/" src/slack_mpm/__version__.py 2>/dev/null || \
+	sed -i  "s/^__version__ = \"[^\"]*\"/__version__ = \"$$VERSION\"/" src/slack_mpm/__version__.py; \
 	echo "$(GREEN)Synced to version $$VERSION$(NC)"
 
 bump-patch: ## Bump patch version (x.y.Z+1)
