@@ -316,7 +316,7 @@ define _do_publish
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	TWINE_PASSWORD="$$PYPI_TOKEN" $(PYTHON) -m twine upload --username __token__ dist/*; \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" \
@@ -351,7 +351,7 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	TWINE_PASSWORD="$$PYPI_TOKEN" $(PYTHON) -m twine upload --username __token__ dist/*; \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
@@ -386,7 +386,7 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	TWINE_PASSWORD="$$PYPI_TOKEN" $(PYTHON) -m twine upload --username __token__ dist/*; \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
@@ -420,7 +420,7 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	TWINE_PASSWORD="$$PYPI_TOKEN" $(PYTHON) -m twine upload --username __token__ dist/*; \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
@@ -443,5 +443,5 @@ publish-only: ## Publish current version to PyPI (no version bump)
 		echo "$(RED)Error: PYPI_TOKEN not found$(NC)"; \
 		exit 1; \
 	fi; \
-	TWINE_PASSWORD="$$PYPI_TOKEN" $(PYTHON) -m twine upload --username __token__ dist/*; \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
 	echo "$(GREEN)Published to PyPI$(NC)"
