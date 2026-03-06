@@ -13,3 +13,7 @@ htmlcov/
 .coverage
 archive/
 *.pstats
+
+# Claude MPM
+.claude-mpm/PM_INSTRUCTIONS.md
+.claude-mpm/PM_INSTRUCTIONS.md.meta
