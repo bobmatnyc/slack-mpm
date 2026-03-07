@@ -11,7 +11,8 @@ async def list_channels(
     token: str,
     types: str = "public_channel,private_channel",
     exclude_archived: bool = True,
-    limit: int = 200,
+    limit: int = 100,
+    name_filter: str | None = None,
 ) -> dict[str, Any]:
     """List all channels in the workspace with pagination.
 
@@ -19,7 +20,8 @@ async def list_channels(
         token: Slack bot token.
         types: Comma-separated list of channel types to include.
         exclude_archived: If True, exclude archived channels.
-        limit: Maximum number of channels per page request.
+        limit: Maximum number of channels to return.
+        name_filter: Optional substring to filter channel names (case-insensitive).
 
     Returns:
         Dict with 'channels' list and metadata.
@@ -44,7 +46,13 @@ async def list_channels(
             break
         cursor = next_cursor
 
-    return {"ok": True, "channels": all_channels[:limit]}
+    result = all_channels[:limit]
+
+    if name_filter is not None:
+        needle = name_filter.lower()
+        result = [ch for ch in result if needle in ch.get("name", "").lower()]
+
+    return {"ok": True, "channels": result}
 
 
 async def get_channel_info(token: str, channel: str) -> dict[str, Any]:
@@ -52,12 +60,14 @@ async def get_channel_info(token: str, channel: str) -> dict[str, Any]:
 
     Args:
         token: Slack bot token.
-        channel: Channel ID (e.g., 'C1234567890').
+        channel: Channel ID (e.g., 'C1234567890').  # pragma: allowlist secret
 
     Returns:
         Dict with 'channel' info object.
     """
-    return await slack_get(token, "conversations.info", {"channel": channel, "include_num_members": "true"})
+    return await slack_get(
+        token, "conversations.info", {"channel": channel, "include_num_members": "true"}
+    )
 
 
 async def create_channel(token: str, name: str, is_private: bool = False) -> dict[str, Any]:

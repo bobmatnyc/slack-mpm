@@ -9,7 +9,16 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from slack_mpm.api import bookmarks, channels, files, messages, reminders, scheduled, users, workspace
+from slack_mpm.api import (
+    bookmarks,
+    channels,
+    files,
+    messages,
+    reminders,
+    scheduled,
+    users,
+    workspace,
+)
 from slack_mpm.api._client import SlackAPIError
 from slack_mpm.auth.token_manager import TokenManager
 
@@ -31,7 +40,7 @@ SLACK_TOOLS: list[types.Tool] = [
             "properties": {
                 "types": {
                     "type": "string",
-                    "description": "Comma-separated channel types: public_channel, private_channel, mpim, im",
+                    "description": "Comma-separated channel types: public_channel, private_channel, mpim, im",  # noqa: E501
                     "default": "public_channel,private_channel",
                 },
                 "exclude_archived": {
@@ -42,7 +51,11 @@ SLACK_TOOLS: list[types.Tool] = [
                 "limit": {
                     "type": "integer",
                     "description": "Maximum number of channels to return",
-                    "default": 200,
+                    "default": 100,
+                },
+                "name_filter": {
+                    "type": "string",
+                    "description": "Optional substring to filter channel names (case-insensitive)",
                 },
             },
         },
@@ -279,7 +292,11 @@ SLACK_TOOLS: list[types.Tool] = [
     ),
     types.Tool(
         name="search_messages",
-        description="Search for messages across the workspace. Requires user token (xoxp-).",
+        description=(
+            "Search for messages across the workspace. "
+            "Requires a user token (xoxp-) with search:read scope — "
+            "bot tokens (xoxb-) are not supported by Slack's search API."
+        ),
         inputSchema={
             "type": "object",
             "properties": {
@@ -377,12 +394,12 @@ SLACK_TOOLS: list[types.Tool] = [
                     "type": "string",
                     "description": "Channel ID containing the message",
                 },
-                "timestamp": {
+                "ts": {
                     "type": "string",
-                    "description": "Message timestamp to pin",
+                    "description": "Message timestamp to pin (e.g. '1234567890.123456')",
                 },
             },
-            "required": ["channel", "timestamp"],
+            "required": ["channel", "ts"],
         },
     ),
     types.Tool(
@@ -395,12 +412,12 @@ SLACK_TOOLS: list[types.Tool] = [
                     "type": "string",
                     "description": "Channel ID containing the message",
                 },
-                "timestamp": {
+                "ts": {
                     "type": "string",
-                    "description": "Message timestamp to unpin",
+                    "description": "Message timestamp to unpin (e.g. '1234567890.123456')",
                 },
             },
-            "required": ["channel", "timestamp"],
+            "required": ["channel", "ts"],
         },
     ),
     types.Tool(
@@ -662,7 +679,7 @@ SLACK_TOOLS: list[types.Tool] = [
                 },
                 "time": {
                     "type": "string",
-                    "description": "When to remind — Unix timestamp or natural language (e.g., 'in 30 minutes', 'tomorrow at 9am')",
+                    "description": "When to remind — Unix timestamp or natural language (e.g., 'in 30 minutes', 'tomorrow at 9am')",  # noqa: E501
                 },
             },
             "required": ["text", "time"],
@@ -855,9 +872,7 @@ class SlackMCPServer:
             return SLACK_TOOLS
 
         @self.server.call_tool()
-        async def call_tool(
-            name: str, arguments: dict[str, Any]
-        ) -> list[types.TextContent]:
+        async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
             try:
                 result = await self._dispatch_tool(name, arguments)
                 return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -886,7 +901,7 @@ class SlackMCPServer:
         handlers: dict[str, Any] = {
             # Channels
             "list_channels": lambda a: channels.list_channels(
-                token, **_pick(a, ["types", "exclude_archived", "limit"])
+                token, **_pick(a, ["types", "exclude_archived", "limit", "name_filter"])
             ),
             "get_channel_info": lambda a: channels.get_channel_info(token, a["channel"]),
             "create_channel": lambda a: channels.create_channel(
@@ -916,12 +931,8 @@ class SlackMCPServer:
             "update_message": lambda a: messages.update_message(
                 token, a["channel"], a["ts"], a["text"]
             ),
-            "delete_message": lambda a: messages.delete_message(
-                token, a["channel"], a["ts"]
-            ),
-            "get_permalink": lambda a: messages.get_permalink(
-                token, a["channel"], a["message_ts"]
-            ),
+            "delete_message": lambda a: messages.delete_message(token, a["channel"], a["ts"]),
+            "get_permalink": lambda a: messages.get_permalink(token, a["channel"], a["message_ts"]),
             "search_messages": lambda a: messages.search_messages(
                 user_token or token,
                 a["query"],
@@ -936,12 +947,8 @@ class SlackMCPServer:
             "remove_reaction": lambda a: messages.remove_reaction(
                 token, a["channel"], a["timestamp"], a["name"]
             ),
-            "pin_message": lambda a: messages.pin_message(
-                token, a["channel"], a["timestamp"]
-            ),
-            "unpin_message": lambda a: messages.unpin_message(
-                token, a["channel"], a["timestamp"]
-            ),
+            "pin_message": lambda a: messages.pin_message(token, a["channel"], a["ts"]),
+            "unpin_message": lambda a: messages.unpin_message(token, a["channel"], a["ts"]),
             "reply_in_thread": lambda a: messages.reply_in_thread(
                 token, a["channel"], a["thread_ts"], a["text"]
             ),
@@ -962,9 +969,7 @@ class SlackMCPServer:
                 a["filename"],
                 **_pick(a, ["title"]),
             ),
-            "list_files": lambda a: files.list_files(
-                token, **_pick(a, ["channel", "count"])
-            ),
+            "list_files": lambda a: files.list_files(token, **_pick(a, ["channel", "count"])),
             "get_file_info": lambda a: files.get_file_info(token, a["file"]),
             "delete_file": lambda a: files.delete_file(token, a["file"]),
             "share_file": lambda a: files.share_file(token, a["file"], a["channels"]),
@@ -985,9 +990,7 @@ class SlackMCPServer:
                 user_token or token, a["reminder"]
             ),
             # Bookmarks
-            "list_bookmarks": lambda a: bookmarks.list_bookmarks(
-                token, a["channel_id"]
-            ),
+            "list_bookmarks": lambda a: bookmarks.list_bookmarks(token, a["channel_id"]),
             "add_bookmark": lambda a: bookmarks.add_bookmark(
                 token,
                 a["channel_id"],

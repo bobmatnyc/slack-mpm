@@ -128,7 +128,10 @@ class TokenManager:
             return self._bot_token
         if self._user_token:
             return self._user_token
-        raise ValueError("No Slack token configured. Set SLACK_BOT_TOKEN in your .env.local file.")
+        raise ValueError(
+            "No Slack token found. Set SLACK_BOT_TOKEN in your environment, "
+            ".env.local file, or in the MCP server's env config."
+        )
 
     async def validate_bot_token(self) -> SlackToken:
         """Validate the bot token by calling auth.test API.

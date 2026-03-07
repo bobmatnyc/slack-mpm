@@ -115,6 +115,7 @@ async def search_messages(token: str, query: str, count: int = 20) -> dict[str, 
     """Search for messages across the workspace.
 
     Note: Requires a user token (xoxp-) with search:read scope.
+    Bot tokens (xoxb-) cannot access Slack's search API.
 
     Args:
         token: Slack user token (xoxp-).
@@ -123,7 +124,16 @@ async def search_messages(token: str, query: str, count: int = 20) -> dict[str, 
 
     Returns:
         Dict with 'messages' containing matches and pagination info.
+
+    Raises:
+        ValueError: If a bot token is provided instead of a user token.
     """
+    if token.startswith("xoxb-"):
+        raise ValueError(
+            "search_messages requires a user token (xoxp-). "
+            "Bot tokens (xoxb-) cannot access Slack's search API. "
+            "Set SLACK_USER_TOKEN in your environment."
+        )
     return await slack_get(
         token,
         "search.messages",
@@ -197,37 +207,35 @@ async def remove_reaction(token: str, channel: str, timestamp: str, name: str) -
     )
 
 
-async def pin_message(token: str, channel: str, timestamp: str) -> dict[str, Any]:
+async def pin_message(token: str, channel: str, ts: str) -> dict[str, Any]:
     """Pin a message in a channel.
 
     Args:
         token: Slack bot token.
         channel: Channel ID containing the message.
-        timestamp: Message timestamp to pin.
+        ts: Message timestamp to pin (Slack API ts format, e.g. '1234567890.123456').
 
     Returns:
         Dict with ok=True on success.
     """
-    return await slack_post(token, "pins.add", {"channel": channel, "timestamp": timestamp})
+    return await slack_post(token, "pins.add", {"channel": channel, "timestamp": ts})
 
 
-async def unpin_message(token: str, channel: str, timestamp: str) -> dict[str, Any]:
+async def unpin_message(token: str, channel: str, ts: str) -> dict[str, Any]:
     """Unpin a message from a channel.
 
     Args:
         token: Slack bot token.
         channel: Channel ID containing the message.
-        timestamp: Message timestamp to unpin.
+        ts: Message timestamp to unpin (Slack API ts format, e.g. '1234567890.123456').
 
     Returns:
         Dict with ok=True on success.
     """
-    return await slack_post(token, "pins.remove", {"channel": channel, "timestamp": timestamp})
+    return await slack_post(token, "pins.remove", {"channel": channel, "timestamp": ts})
 
 
-async def reply_in_thread(
-    token: str, channel: str, thread_ts: str, text: str
-) -> dict[str, Any]:
+async def reply_in_thread(token: str, channel: str, thread_ts: str, text: str) -> dict[str, Any]:
     """Reply to a message in a thread.
 
     Args:
