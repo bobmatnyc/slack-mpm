@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.asyncio
@@ -165,11 +166,23 @@ async def test_tool_schemas_have_required_fields() -> None:
     from slack_mpm.server.slack_mcp_server import SLACK_TOOLS
 
     tools_with_channel = {
-        "get_channel_info", "archive_channel", "invite_to_channel",
-        "kick_from_channel", "join_channel", "set_channel_topic",
-        "send_ephemeral", "update_message", "delete_message", "get_permalink",
-        "list_history", "add_reaction", "remove_reaction", "pin_message",
-        "unpin_message", "reply_in_thread", "get_thread_replies",
+        "get_channel_info",
+        "archive_channel",
+        "invite_to_channel",
+        "kick_from_channel",
+        "join_channel",
+        "set_channel_topic",
+        "send_ephemeral",
+        "update_message",
+        "delete_message",
+        "get_permalink",
+        "list_history",
+        "add_reaction",
+        "remove_reaction",
+        "pin_message",
+        "unpin_message",
+        "reply_in_thread",
+        "get_thread_replies",
     }
 
     tool_map = {t.name: t for t in SLACK_TOOLS}

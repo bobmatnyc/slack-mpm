@@ -73,7 +73,11 @@ async def upload_file(
         await slack_post(
             token,
             "chat.postMessage",
-            {"channel": extra_channel, "text": f"Shared file: {filename}", "attachments": [{"fallback": filename, "file_id": file_id}]},
+            {
+                "channel": extra_channel,
+                "text": f"Shared file: {filename}",
+                "attachments": [{"fallback": filename, "file_id": file_id}],
+            },
         )
 
     return result
@@ -106,7 +110,7 @@ async def get_file_info(token: str, file: str) -> dict[str, Any]:
 
     Args:
         token: Slack bot token.
-        file: File ID (e.g., 'F1234567890').
+        file: File ID (e.g., 'F1234567890').  # pragma: allowlist secret
 
     Returns:
         Dict with 'file' object.

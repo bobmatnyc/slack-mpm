@@ -1,7 +1,6 @@
 """Pydantic models for Slack authentication."""
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,10 +20,10 @@ class SlackToken(BaseModel):
     token: str = Field(..., description="The Slack API token value")
     token_type: str = Field(..., description="Type of token: 'bot' or 'user'")
     status: TokenStatus = Field(default=TokenStatus.UNKNOWN, description="Validation status")
-    team_id: Optional[str] = Field(default=None, description="Slack workspace/team ID")
-    team_name: Optional[str] = Field(default=None, description="Slack workspace name")
-    user_id: Optional[str] = Field(default=None, description="User ID associated with token")
-    bot_id: Optional[str] = Field(default=None, description="Bot ID (for bot tokens)")
+    team_id: str | None = Field(default=None, description="Slack workspace/team ID")
+    team_name: str | None = Field(default=None, description="Slack workspace name")
+    user_id: str | None = Field(default=None, description="User ID associated with token")
+    bot_id: str | None = Field(default=None, description="Bot ID (for bot tokens)")
     scopes: list[str] = Field(default_factory=list, description="OAuth scopes granted")
 
     class Config:
@@ -52,7 +51,7 @@ class WorkspaceInfo(BaseModel):
 
     team_id: str = Field(..., description="Workspace team ID")
     team_name: str = Field(..., description="Workspace name")
-    team_domain: Optional[str] = Field(default=None, description="Workspace URL domain")
-    team_url: Optional[str] = Field(default=None, description="Workspace URL")
-    enterprise_id: Optional[str] = Field(default=None, description="Enterprise grid ID")
-    enterprise_name: Optional[str] = Field(default=None, description="Enterprise grid name")
+    team_domain: str | None = Field(default=None, description="Workspace URL domain")
+    team_url: str | None = Field(default=None, description="Workspace URL")
+    enterprise_id: str | None = Field(default=None, description="Enterprise grid ID")
+    enterprise_name: str | None = Field(default=None, description="Enterprise grid name")
