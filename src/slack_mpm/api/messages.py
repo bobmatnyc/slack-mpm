@@ -18,7 +18,7 @@ async def send_message(
     """Send a message to a channel.
 
     Args:
-        token: Slack bot token.
+        token: Slack API token (bot xoxb- or user xoxp-).
         channel: Channel ID or name to send to.
         text: Message text (also used as fallback for blocks).
         blocks: Optional Block Kit blocks array for rich formatting.
@@ -45,7 +45,7 @@ async def send_ephemeral(token: str, channel: str, user: str, text: str) -> dict
     """Send an ephemeral message visible only to a specific user.
 
     Args:
-        token: Slack bot token.
+        token: Slack API token (bot xoxb- or user xoxp-).
         channel: Channel ID where the ephemeral message appears.
         user: User ID who will see the message.
         text: Message text.
@@ -64,7 +64,7 @@ async def update_message(token: str, channel: str, ts: str, text: str) -> dict[s
     """Update an existing message.
 
     Args:
-        token: Slack bot token.
+        token: Slack API token (bot xoxb- or user xoxp-).
         channel: Channel ID containing the message.
         ts: Timestamp of the message to update.
         text: New text for the message.
@@ -83,7 +83,7 @@ async def delete_message(token: str, channel: str, ts: str) -> dict[str, Any]:
     """Delete a message.
 
     Args:
-        token: Slack bot token.
+        token: Slack API token (bot xoxb- or user xoxp-).
         channel: Channel ID containing the message.
         ts: Timestamp of the message to delete.
 
@@ -173,7 +173,7 @@ async def add_reaction(token: str, channel: str, timestamp: str, name: str) -> d
     """Add an emoji reaction to a message.
 
     Args:
-        token: Slack bot token.
+        token: Slack API token (bot xoxb- or user xoxp-).
         channel: Channel ID containing the message.
         timestamp: Message timestamp.
         name: Emoji name without colons (e.g., 'thumbsup').

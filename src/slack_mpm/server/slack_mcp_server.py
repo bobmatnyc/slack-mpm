@@ -206,6 +206,11 @@ SLACK_TOOLS: list[types.Tool] = [
                     "description": "Whether to unfurl links",
                     "default": True,
                 },
+                "use_user_token": {
+                    "type": "boolean",
+                    "description": "Send as the authenticated user (requires xoxp- user token) rather than the bot",  # noqa: E501
+                    "default": False,
+                },
             },
             "required": ["channel", "text"],
         },
@@ -249,6 +254,11 @@ SLACK_TOOLS: list[types.Tool] = [
                 "text": {
                     "type": "string",
                     "description": "New text for the message",
+                },
+                "use_user_token": {
+                    "type": "boolean",
+                    "description": "Send as the authenticated user (requires xoxp- user token) rather than the bot",  # noqa: E501
+                    "default": False,
                 },
             },
             "required": ["channel", "ts", "text"],
@@ -358,6 +368,11 @@ SLACK_TOOLS: list[types.Tool] = [
                     "type": "string",
                     "description": "Emoji name without colons (e.g., 'thumbsup')",
                 },
+                "use_user_token": {
+                    "type": "boolean",
+                    "description": "React as the authenticated user (requires xoxp- user token) rather than the bot",  # noqa: E501
+                    "default": False,
+                },
             },
             "required": ["channel", "timestamp", "name"],
         },
@@ -379,6 +394,11 @@ SLACK_TOOLS: list[types.Tool] = [
                 "name": {
                     "type": "string",
                     "description": "Emoji name without colons (e.g., 'thumbsup')",
+                },
+                "use_user_token": {
+                    "type": "boolean",
+                    "description": "Remove reaction as the authenticated user (requires xoxp- user token) rather than the bot",  # noqa: E501
+                    "default": False,
                 },
             },
             "required": ["channel", "timestamp", "name"],
@@ -437,6 +457,11 @@ SLACK_TOOLS: list[types.Tool] = [
                 "text": {
                     "type": "string",
                     "description": "Reply text",
+                },
+                "use_user_token": {
+                    "type": "boolean",
+                    "description": "Send as the authenticated user (requires xoxp- user token) rather than the bot",  # noqa: E501
+                    "default": False,
                 },
             },
             "required": ["channel", "thread_ts", "text"],
@@ -872,6 +897,44 @@ class SlackMCPServer:
         """
         return self._token_manager.get_token(prefer_user=prefer_user)
 
+    def _resolve_write_token(self, arguments: dict[str, Any], bot_token: str) -> str:
+        """Resolve the token to use for a write operation.
+
+        When ``use_user_token`` is ``True`` in *arguments*, the user token is
+        returned.  If no user token is configured in that case, a
+        :class:`~slack_mpm.api._client.SlackAPIError` is raised with a clear
+        message so the MCP caller receives actionable feedback.
+
+        When ``use_user_token`` is ``False`` or absent, *bot_token* is
+        returned unchanged — preserving the existing default behaviour.
+
+        Args:
+            arguments: Tool arguments dict from the MCP client.
+            bot_token: The bot token (xoxb-) to use when not overriding.
+
+        Returns:
+            The token string to pass to the API call.
+
+        Raises:
+            SlackAPIError: If ``use_user_token=True`` but no user token is
+                configured.
+        """
+        if arguments.get("use_user_token"):
+            user_token = self._token_manager.user_token
+            if not user_token:
+                raise SlackAPIError(
+                    "token_resolution",
+                    "user_token_not_configured",
+                    {
+                        "message": (
+                            "User token (xoxp-) not configured. "
+                            "Set SLACK_USER_TOKEN environment variable."
+                        )
+                    },
+                )
+            return user_token
+        return bot_token
+
     def _setup_handlers(self) -> None:
         """Register MCP tool handlers on the server."""
 
@@ -928,7 +991,7 @@ class SlackMCPServer:
             ),
             # Messages
             "send_message": lambda a: messages.send_message(
-                user_token or token,
+                self._resolve_write_token(a, token),
                 a["channel"],
                 a["text"],
                 **_pick(a, ["blocks", "thread_ts", "unfurl_links"]),
@@ -937,7 +1000,7 @@ class SlackMCPServer:
                 user_token or token, a["channel"], a["user"], a["text"]
             ),
             "update_message": lambda a: messages.update_message(
-                user_token or token, a["channel"], a["ts"], a["text"]
+                self._resolve_write_token(a, token), a["channel"], a["ts"], a["text"]
             ),
             "delete_message": lambda a: messages.delete_message(
                 user_token or token, a["channel"], a["ts"]
@@ -952,10 +1015,10 @@ class SlackMCPServer:
                 token, a["channel"], **_pick(a, ["limit", "oldest", "latest"])
             ),
             "add_reaction": lambda a: messages.add_reaction(
-                user_token or token, a["channel"], a["timestamp"], a["name"]
+                self._resolve_write_token(a, token), a["channel"], a["timestamp"], a["name"]
             ),
             "remove_reaction": lambda a: messages.remove_reaction(
-                user_token or token, a["channel"], a["timestamp"], a["name"]
+                self._resolve_write_token(a, token), a["channel"], a["timestamp"], a["name"]
             ),
             "pin_message": lambda a: messages.pin_message(
                 user_token or token, a["channel"], a["ts"]
@@ -964,7 +1027,7 @@ class SlackMCPServer:
                 user_token or token, a["channel"], a["ts"]
             ),
             "reply_in_thread": lambda a: messages.reply_in_thread(
-                user_token or token, a["channel"], a["thread_ts"], a["text"]
+                self._resolve_write_token(a, token), a["channel"], a["thread_ts"], a["text"]
             ),
             "get_thread_replies": lambda a: messages.get_thread_replies(
                 token, a["channel"], a["thread_ts"]
