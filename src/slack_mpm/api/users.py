@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from slack_mpm.api._client import slack_get, slack_post
+from slack_mpm.api._pagination import paginate
 
 
 async def list_users(token: str, limit: int = 200) -> dict[str, Any]:
@@ -18,20 +19,14 @@ async def list_users(token: str, limit: int = 200) -> dict[str, Any]:
         Dict with 'members' list.
     """
     all_members: list[dict[str, Any]] = []
-    cursor: str | None = None
 
-    while True:
-        params: dict[str, Any] = {"limit": min(limit, 200)}
-        if cursor:
-            params["cursor"] = cursor
+    async def _api_fn(**params: Any) -> dict[str, Any]:
+        return await slack_get(token, "users.list", params)
 
-        data = await slack_get(token, "users.list", params)
-        all_members.extend(data.get("members", []))
-
-        next_cursor = data.get("response_metadata", {}).get("next_cursor")
-        if not next_cursor or len(all_members) >= limit:
+    async for page in paginate(_api_fn, "members", limit=min(limit, 200)):
+        all_members.extend(page)
+        if len(all_members) >= limit:
             break
-        cursor = next_cursor
 
     return {"ok": True, "members": all_members[:limit]}
 
@@ -86,19 +81,11 @@ async def list_user_channels(token: str, user: str) -> dict[str, Any]:
         Dict with 'channels' list.
     """
     all_channels: list[dict[str, Any]] = []
-    cursor: str | None = None
 
-    while True:
-        params: dict[str, Any] = {"user": user, "limit": 200}
-        if cursor:
-            params["cursor"] = cursor
+    async def _api_fn(**params: Any) -> dict[str, Any]:
+        return await slack_get(token, "users.conversations", params)
 
-        data = await slack_get(token, "users.conversations", params)
-        all_channels.extend(data.get("channels", []))
-
-        next_cursor = data.get("response_metadata", {}).get("next_cursor")
-        if not next_cursor:
-            break
-        cursor = next_cursor
+    async for page in paginate(_api_fn, "channels", limit=200, user=user):
+        all_channels.extend(page)
 
     return {"ok": True, "channels": all_channels}

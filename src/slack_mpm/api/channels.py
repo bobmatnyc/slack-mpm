@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from slack_mpm.api._client import slack_get, slack_post
+from slack_mpm.api._pagination import paginate
 
 
 async def list_channels(
@@ -27,24 +28,20 @@ async def list_channels(
         Dict with 'channels' list and metadata.
     """
     all_channels: list[dict[str, Any]] = []
-    cursor: str | None = None
 
-    while True:
-        params: dict[str, Any] = {
-            "types": types,
-            "exclude_archived": str(exclude_archived).lower(),
-            "limit": min(limit, 200),
-        }
-        if cursor:
-            params["cursor"] = cursor
+    async def _api_fn(**params: Any) -> dict[str, Any]:
+        return await slack_get(token, "conversations.list", params)
 
-        data = await slack_get(token, "conversations.list", params)
-        all_channels.extend(data.get("channels", []))
-
-        next_cursor = data.get("response_metadata", {}).get("next_cursor")
-        if not next_cursor or len(all_channels) >= limit:
+    async for page in paginate(
+        _api_fn,
+        "channels",
+        limit=min(limit, 200),
+        types=types,
+        exclude_archived=str(exclude_archived).lower(),
+    ):
+        all_channels.extend(page)
+        if len(all_channels) >= limit:
             break
-        cursor = next_cursor
 
     result = all_channels[:limit]
 

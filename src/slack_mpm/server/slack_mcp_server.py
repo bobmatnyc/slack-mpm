@@ -844,10 +844,18 @@ SLACK_TOOLS: list[types.Tool] = [
 class SlackMCPServer:
     """Thin MCP adapter that exposes Slack API functions as MCP tools."""
 
-    def __init__(self) -> None:
-        """Initialize the Slack MCP server."""
+    def __init__(self, token_manager: TokenManager | None = None) -> None:
+        """Initialize the Slack MCP server.
+
+        Args:
+            token_manager: Optional :class:`~slack_mpm.auth.token_manager.TokenManager`
+                instance.  When ``None`` (the default), a fresh ``TokenManager()``
+                is constructed automatically, preserving the existing behaviour for
+                production use while allowing tests to supply a pre-configured or
+                mock instance without env-var patching.
+        """
         self.server: Server = Server("slack-mpm")
-        self._token_manager = TokenManager()
+        self._token_manager = token_manager or TokenManager()
         self._setup_handlers()
 
     def _get_token(self, prefer_user: bool = False) -> str:
@@ -867,11 +875,11 @@ class SlackMCPServer:
     def _setup_handlers(self) -> None:
         """Register MCP tool handlers on the server."""
 
-        @self.server.list_tools()
+        @self.server.list_tools()  # type: ignore
         async def list_tools() -> list[types.Tool]:
             return SLACK_TOOLS
 
-        @self.server.call_tool()
+        @self.server.call_tool()  # type: ignore
         async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
             try:
                 result = await self._dispatch_tool(name, arguments)
@@ -920,18 +928,20 @@ class SlackMCPServer:
             ),
             # Messages
             "send_message": lambda a: messages.send_message(
-                token,
+                user_token or token,
                 a["channel"],
                 a["text"],
                 **_pick(a, ["blocks", "thread_ts", "unfurl_links"]),
             ),
             "send_ephemeral": lambda a: messages.send_ephemeral(
-                token, a["channel"], a["user"], a["text"]
+                user_token or token, a["channel"], a["user"], a["text"]
             ),
             "update_message": lambda a: messages.update_message(
-                token, a["channel"], a["ts"], a["text"]
+                user_token or token, a["channel"], a["ts"], a["text"]
             ),
-            "delete_message": lambda a: messages.delete_message(token, a["channel"], a["ts"]),
+            "delete_message": lambda a: messages.delete_message(
+                user_token or token, a["channel"], a["ts"]
+            ),
             "get_permalink": lambda a: messages.get_permalink(token, a["channel"], a["message_ts"]),
             "search_messages": lambda a: messages.search_messages(
                 user_token or token,
@@ -942,15 +952,19 @@ class SlackMCPServer:
                 token, a["channel"], **_pick(a, ["limit", "oldest", "latest"])
             ),
             "add_reaction": lambda a: messages.add_reaction(
-                token, a["channel"], a["timestamp"], a["name"]
+                user_token or token, a["channel"], a["timestamp"], a["name"]
             ),
             "remove_reaction": lambda a: messages.remove_reaction(
-                token, a["channel"], a["timestamp"], a["name"]
+                user_token or token, a["channel"], a["timestamp"], a["name"]
             ),
-            "pin_message": lambda a: messages.pin_message(token, a["channel"], a["ts"]),
-            "unpin_message": lambda a: messages.unpin_message(token, a["channel"], a["ts"]),
+            "pin_message": lambda a: messages.pin_message(
+                user_token or token, a["channel"], a["ts"]
+            ),
+            "unpin_message": lambda a: messages.unpin_message(
+                user_token or token, a["channel"], a["ts"]
+            ),
             "reply_in_thread": lambda a: messages.reply_in_thread(
-                token, a["channel"], a["thread_ts"], a["text"]
+                user_token or token, a["channel"], a["thread_ts"], a["text"]
             ),
             "get_thread_replies": lambda a: messages.get_thread_replies(
                 token, a["channel"], a["thread_ts"]
@@ -1003,7 +1017,7 @@ class SlackMCPServer:
             ),
             # Scheduled messages
             "schedule_message": lambda a: scheduled.schedule_message(
-                token, a["channel"], a["text"], a["post_at"]
+                user_token or token, a["channel"], a["text"], a["post_at"]
             ),
             "list_scheduled_messages": lambda a: scheduled.list_scheduled_messages(
                 token, **_pick(a, ["channel"])
@@ -1016,7 +1030,8 @@ class SlackMCPServer:
         if name not in handlers:
             raise ValueError(f"Unknown tool: {name}")
 
-        return await handlers[name](arguments)
+        result: dict[str, Any] = await handlers[name](arguments)
+        return result
 
     async def run(self) -> None:
         """Run the MCP server over stdio."""
