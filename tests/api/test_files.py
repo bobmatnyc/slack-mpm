@@ -211,6 +211,39 @@ async def test_upload_file_multi_channel_batch(
     assert mock_post.call_count == 1
     complete_payload = mock_post.call_args[0][2]
     assert complete_payload["channels"] == ["C1", "C2", "C3"]
+    # Slack accepts EITHER channels (array) OR channel_id (single) — not both
+    assert "channel_id" not in complete_payload
+
+
+@pytest.mark.asyncio
+async def test_upload_file_single_channel_uses_channel_id_only(
+    mock_url_data: dict, mock_complete_data: dict
+) -> None:
+    """upload_file sends channel_id (not channels) for a single-channel upload."""
+    from slack_mpm.api.files import upload_file
+
+    mock_upload_resp = MagicMock()
+    mock_upload_resp.raise_for_status = MagicMock()
+
+    with (
+        patch("slack_mpm.api.files.slack_get", new=AsyncMock(return_value=mock_url_data)),
+        patch(
+            "slack_mpm.api.files.slack_post", new=AsyncMock(return_value=mock_complete_data)
+        ) as mock_post,
+        patch("httpx.AsyncClient") as mock_client_cls,
+    ):
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.post = AsyncMock(return_value=mock_upload_resp)
+        mock_client_cls.return_value = mock_client
+
+        await upload_file("xoxb-token", ["C1"], content="hello", filename="test.txt")
+
+    complete_payload = mock_post.call_args[0][2]
+    assert complete_payload["channel_id"] == "C1"
+    # Slack accepts EITHER channel_id (single) OR channels (array) — not both
+    assert "channels" not in complete_payload
 
 
 @pytest.mark.asyncio

@@ -102,14 +102,17 @@ async def upload_file(
         )
         upload_resp.raise_for_status()
 
-    # Step 3: Complete the upload, sharing to ALL channels in one call
+    # Step 3: Complete the upload, sharing to ALL channels in one call.
+    # Slack's files.completeUploadExternal accepts EITHER channel_id (single str)
+    # OR channels (array) — not both simultaneously.
     complete_payload: dict[str, Any] = {
         "files": [{"id": file_id, "title": title or filename}],
-        "channel_id": channels[0] if channels else "",
     }
     if len(channels) > 1:
         # Pass all channels to completeUploadExternal (max 100 per Slack docs)
         complete_payload["channels"] = channels
+    else:
+        complete_payload["channel_id"] = channels[0] if channels else ""
 
     if thread_ts is not None:
         complete_payload["thread_ts"] = thread_ts
