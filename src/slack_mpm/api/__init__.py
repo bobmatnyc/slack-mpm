@@ -2,8 +2,10 @@
 
 from slack_mpm.api import (
     bookmarks,
+    canvases,
     channels,
     files,
+    lists,
     messages,
     reminders,
     scheduled,
@@ -20,4 +22,6 @@ __all__ = [
     "reminders",
     "bookmarks",
     "scheduled",
+    "canvases",
+    "lists",
 ]
