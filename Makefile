@@ -110,12 +110,12 @@ install-dev: ## Install package with dev dependencies
 
 test: ## Run pytest
 	@echo "$(YELLOW)Running tests...$(NC)"
-	uv run pytest tests/ -v
+	uv run python -m pytest tests/ -v
 	@echo "$(GREEN)Tests completed.$(NC)"
 
 test-cov: ## Run pytest with coverage
 	@echo "$(YELLOW)Running tests with coverage...$(NC)"
-	uv run pytest tests/ -v --cov=src/$(PACKAGE) --cov-report=html --cov-report=term
+	uv run python -m pytest tests/ -v --cov=src/$(PACKAGE) --cov-report=html --cov-report=term
 	@echo "$(GREEN)Coverage report generated in htmlcov/$(NC)"
 
 # ============================================================================
