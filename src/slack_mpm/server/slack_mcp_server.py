@@ -11,8 +11,10 @@ from mcp.server.stdio import stdio_server
 
 from slack_mpm.api import (
     bookmarks,
+    canvases,
     channels,
     files,
+    lists,
     messages,
     reminders,
     scheduled,
@@ -21,11 +23,34 @@ from slack_mpm.api import (
 )
 from slack_mpm.api._client import SlackAPIError
 from slack_mpm.auth.token_manager import TokenManager
+from slack_mpm.content import ContentConversionError, markdown_to_canvas, markdown_to_list
 
 
 def _pick(args: dict[str, Any], keys: list[str]) -> dict[str, Any]:
     """Return a subset of dict containing only specified keys that are present."""
     return {k: v for k, v in args.items() if k in keys}
+
+
+async def _wrap_conversion_result(coro: Any) -> dict[str, Any]:
+    """Await a coroutine returning a string and wrap it in a dict.
+
+    Why: _dispatch_tool must return dict[str, Any]; conversion tools return str/list.
+    What: Awaits the coroutine and wraps the result under 'result' key.
+    Test: Pass an async function returning "hello", assert {"result": "hello"} returned.
+    """
+    value = await coro
+    return {"ok": True, "result": value}
+
+
+async def _wrap_list_result(coro: Any) -> dict[str, Any]:
+    """Await a coroutine returning a list and wrap it in a dict.
+
+    Why: _dispatch_tool must return dict[str, Any]; list conversion returns a list.
+    What: Awaits the coroutine and wraps the result under 'items' key.
+    Test: Pass an async function returning [{"value": "x"}], assert items key present.
+    """
+    value = await coro
+    return {"ok": True, "items": value}
 
 
 SLACK_TOOLS: list[types.Tool] = [
@@ -564,18 +589,25 @@ SLACK_TOOLS: list[types.Tool] = [
     # -------------------------------------------------------------------------
     types.Tool(
         name="upload_file",
-        description="Upload a file to one or more Slack channels.",
+        description=(
+            "Upload a file to one or more Slack channels. "
+            "Provide either 'content' (UTF-8 text only) or 'file_path' (disk path for binary or text files), not both."  # noqa: E501
+        ),
         inputSchema={
             "type": "object",
             "properties": {
                 "channels": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of channel IDs to share the file in",
+                    "description": "List of channel IDs to share the file in (max 100)",
                 },
                 "content": {
                     "type": "string",
-                    "description": "File content as text",
+                    "description": "File content as text (mutually exclusive with file_path)",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to file on disk (mutually exclusive with content)",
                 },
                 "filename": {
                     "type": "string",
@@ -585,8 +617,12 @@ SLACK_TOOLS: list[types.Tool] = [
                     "type": "string",
                     "description": "Optional display title for the file",
                 },
+                "thread_ts": {
+                    "type": "string",
+                    "description": "Optional thread timestamp to attach upload to a thread",
+                },
             },
-            "required": ["channels", "content", "filename"],
+            "required": ["channels", "filename"],
         },
     ),
     types.Tool(
@@ -863,6 +899,416 @@ SLACK_TOOLS: list[types.Tool] = [
             "required": ["channel", "scheduled_message_id"],
         },
     ),
+    # -------------------------------------------------------------------------
+    # Canvas tools
+    # -------------------------------------------------------------------------
+    types.Tool(
+        name="create_canvas",
+        description="Create a workspace-level canvas with markdown content. Requires canvases:write scope.",  # noqa: E501
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Canvas title",
+                },
+                "document_content": {
+                    "type": "string",
+                    "description": "Markdown content for the canvas",
+                },
+            },
+            "required": ["title", "document_content"],
+        },
+    ),
+    types.Tool(
+        name="create_channel_canvas",
+        description="Create a canvas attached to a Slack channel. Requires canvases:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "type": "string",
+                    "description": "Channel ID to attach the canvas to",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Canvas title",
+                },
+                "document_content": {
+                    "type": "string",
+                    "description": "Markdown content for the canvas",
+                },
+            },
+            "required": ["channel", "title", "document_content"],
+        },
+    ),
+    types.Tool(
+        name="edit_canvas",
+        description="Edit (replace content of) an existing canvas. Requires canvases:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "canvas_id": {
+                    "type": "string",
+                    "description": "Canvas ID to edit",
+                },
+                "document_content": {
+                    "type": "string",
+                    "description": "New markdown content",
+                },
+                "operation_id": {
+                    "type": "string",
+                    "description": "Optional idempotency key for the edit",
+                },
+            },
+            "required": ["canvas_id", "document_content"],
+        },
+    ),
+    types.Tool(
+        name="delete_canvas",
+        description="Delete a canvas. Requires canvases:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "canvas_id": {
+                    "type": "string",
+                    "description": "Canvas ID to delete",
+                },
+            },
+            "required": ["canvas_id"],
+        },
+    ),
+    types.Tool(
+        name="set_canvas_access",
+        description="Set access rules for a canvas (grant read/write/owner to users or groups).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "canvas_id": {
+                    "type": "string",
+                    "description": "Canvas ID",
+                },
+                "access_level": {
+                    "type": "string",
+                    "description": "Access level: 'read', 'write', or 'owner'",
+                },
+                "user_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of user IDs to grant access to",
+                },
+                "group_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of group IDs to grant access to",
+                },
+            },
+            "required": ["canvas_id", "access_level"],
+        },
+    ),
+    types.Tool(
+        name="delete_canvas_access",
+        description="Revoke access to a canvas for a user or group.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "canvas_id": {
+                    "type": "string",
+                    "description": "Canvas ID",
+                },
+                "user_id": {
+                    "type": "string",
+                    "description": "User ID to revoke access for",
+                },
+                "group_id": {
+                    "type": "string",
+                    "description": "Group ID to revoke access for",
+                },
+            },
+            "required": ["canvas_id"],
+        },
+    ),
+    types.Tool(
+        name="lookup_canvas_sections",
+        description="Look up sections/blocks in a canvas. Requires canvases:read scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "canvas_id": {
+                    "type": "string",
+                    "description": "Canvas ID",
+                },
+            },
+            "required": ["canvas_id"],
+        },
+    ),
+    # -------------------------------------------------------------------------
+    # List tools
+    # -------------------------------------------------------------------------
+    types.Tool(
+        name="create_list",
+        description=(
+            "Create a new Slack List in a channel. "
+            "Requires lists:write scope and a paid Slack plan."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "type": "string",
+                    "description": "Channel ID to create the list in",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "List name",
+                },
+                "items": {
+                    "type": "array",
+                    "description": "Optional initial list items (each is a dict with key-value pairs)",  # noqa: E501
+                },
+            },
+            "required": ["channel", "name"],
+        },
+    ),
+    types.Tool(
+        name="update_list",
+        description="Update a Slack List's metadata (name, description). Requires lists:write scope.",  # noqa: E501
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID to update",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "New list name (optional)",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "New list description (optional)",
+                },
+            },
+            "required": ["list_id"],
+        },
+    ),
+    types.Tool(
+        name="create_list_item",
+        description="Add a new item to a Slack List. Requires lists:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "Item text/value",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Optional status (e.g., 'incomplete', 'complete')",
+                },
+            },
+            "required": ["list_id", "value"],
+        },
+    ),
+    types.Tool(
+        name="update_list_item",
+        description="Update an existing Slack List item. Requires lists:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "item_id": {
+                    "type": "string",
+                    "description": "Item ID to update",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "New item text (optional)",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "New status (optional)",
+                },
+            },
+            "required": ["list_id", "item_id"],
+        },
+    ),
+    types.Tool(
+        name="delete_list_item",
+        description="Delete a single item from a Slack List. Requires lists:write scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "item_id": {
+                    "type": "string",
+                    "description": "Item ID to delete",
+                },
+            },
+            "required": ["list_id", "item_id"],
+        },
+    ),
+    types.Tool(
+        name="delete_list_items",
+        description="Delete multiple items from a Slack List in one call. Requires lists:write scope.",  # noqa: E501
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "item_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of item IDs to delete",
+                },
+            },
+            "required": ["list_id", "item_ids"],
+        },
+    ),
+    types.Tool(
+        name="list_list_items",
+        description="Fetch all items in a Slack List (paginated). Requires lists:read scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max items per page (default 100)",
+                    "default": 100,
+                },
+            },
+            "required": ["list_id"],
+        },
+    ),
+    types.Tool(
+        name="get_list_item",
+        description="Get details for a single Slack List item. Requires lists:read scope.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "item_id": {
+                    "type": "string",
+                    "description": "Item ID",
+                },
+            },
+            "required": ["list_id", "item_id"],
+        },
+    ),
+    types.Tool(
+        name="set_list_access",
+        description="Set access rules for a Slack List (grant read/write/owner to users or groups).",  # noqa: E501
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "access_level": {
+                    "type": "string",
+                    "description": "Access level: 'read', 'write', or 'owner'",
+                },
+                "user_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of user IDs to grant access to",
+                },
+                "group_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of group IDs to grant access to",
+                },
+            },
+            "required": ["list_id", "access_level"],
+        },
+    ),
+    types.Tool(
+        name="delete_list_access",
+        description="Revoke access to a Slack List for a user or group.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "List ID",
+                },
+                "user_id": {
+                    "type": "string",
+                    "description": "User ID to revoke access for",
+                },
+                "group_id": {
+                    "type": "string",
+                    "description": "Group ID to revoke access for",
+                },
+            },
+            "required": ["list_id"],
+        },
+    ),
+    # -------------------------------------------------------------------------
+    # Content conversion tools
+    # -------------------------------------------------------------------------
+    types.Tool(
+        name="markdown_to_canvas",
+        description=(
+            "Validate and prepare markdown content for canvas creation. "
+            "Accepts a markdown string or a file path, returns the validated content "
+            "suitable for create_canvas() or create_channel_canvas()."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Markdown string (mutually exclusive with file_path)",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to a .md file to read (mutually exclusive with content)",
+                },
+            },
+        },
+    ),
+    types.Tool(
+        name="markdown_to_list",
+        description=(
+            "Convert markdown to Slack List items. "
+            "Parses checklists (- [ ] / - [x]), bullet lists (- item), and tables. "
+            "Returns a list of dicts with 'value' and optional 'status'."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Markdown string (mutually exclusive with file_path)",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to a .md file to read (mutually exclusive with content)",
+                },
+            },
+        },
+    ),
 ]
 
 
@@ -949,6 +1395,10 @@ class SlackMCPServer:
                 return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
             except SlackAPIError as e:
                 return [types.TextContent(type="text", text=f"Slack API error: {e.error}")]
+            except ContentConversionError as e:
+                return [
+                    types.TextContent(type="text", text=f"Content conversion error: {e.message}")
+                ]
             except ValueError as e:
                 return [types.TextContent(type="text", text=str(e))]
 
@@ -1042,9 +1492,9 @@ class SlackMCPServer:
             "upload_file": lambda a: files.upload_file(
                 token,
                 a["channels"],
-                a["content"],
-                a["filename"],
-                **_pick(a, ["title"]),
+                content=a.get("content"),
+                filename=a.get("filename", ""),
+                **_pick(a, ["title", "file_path", "thread_ts"]),
             ),
             "list_files": lambda a: files.list_files(token, **_pick(a, ["channel", "count"])),
             "get_file_info": lambda a: files.get_file_info(token, a["file"]),
@@ -1087,6 +1537,76 @@ class SlackMCPServer:
             ),
             "delete_scheduled_message": lambda a: scheduled.delete_scheduled_message(
                 token, a["channel"], a["scheduled_message_id"]
+            ),
+            # Canvases
+            "create_canvas": lambda a: canvases.create_canvas(
+                token, a["title"], a["document_content"]
+            ),
+            "create_channel_canvas": lambda a: canvases.create_channel_canvas(
+                token, a["channel"], a["title"], a["document_content"]
+            ),
+            "edit_canvas": lambda a: canvases.edit_canvas(
+                token,
+                a["canvas_id"],
+                a["document_content"],
+                **_pick(a, ["operation_id"]),
+            ),
+            "delete_canvas": lambda a: canvases.delete_canvas(token, a["canvas_id"]),
+            "set_canvas_access": lambda a: canvases.set_canvas_access(
+                token,
+                a["canvas_id"],
+                a["access_level"],
+                **_pick(a, ["user_ids", "group_ids"]),
+            ),
+            "delete_canvas_access": lambda a: canvases.delete_canvas_access(
+                token,
+                a["canvas_id"],
+                **_pick(a, ["user_id", "group_id"]),
+            ),
+            "lookup_canvas_sections": lambda a: canvases.lookup_canvas_sections(
+                token, a["canvas_id"]
+            ),
+            # Lists
+            "create_list": lambda a: lists.create_list(
+                token, a["channel"], a["name"], **_pick(a, ["items"])
+            ),
+            "update_list": lambda a: lists.update_list(
+                token, a["list_id"], **_pick(a, ["name", "description"])
+            ),
+            "create_list_item": lambda a: lists.create_list_item(
+                token, a["list_id"], a["value"], **_pick(a, ["status"])
+            ),
+            "update_list_item": lambda a: lists.update_list_item(
+                token,
+                a["list_id"],
+                a["item_id"],
+                **_pick(a, ["value", "status"]),
+            ),
+            "delete_list_item": lambda a: lists.delete_list_item(token, a["list_id"], a["item_id"]),
+            "delete_list_items": lambda a: lists.delete_list_items(
+                token, a["list_id"], a["item_ids"]
+            ),
+            "list_list_items": lambda a: lists.list_list_items(
+                token, a["list_id"], **_pick(a, ["limit"])
+            ),
+            "get_list_item": lambda a: lists.get_list_item(token, a["list_id"], a["item_id"]),
+            "set_list_access": lambda a: lists.set_list_access(
+                token,
+                a["list_id"],
+                a["access_level"],
+                **_pick(a, ["user_ids", "group_ids"]),
+            ),
+            "delete_list_access": lambda a: lists.delete_list_access(
+                token,
+                a["list_id"],
+                **_pick(a, ["user_id", "group_id"]),
+            ),
+            # Content conversion (return wrapped dict so dispatch stays uniform)
+            "markdown_to_canvas": lambda a: _wrap_conversion_result(
+                markdown_to_canvas(**_pick(a, ["content", "file_path"]))
+            ),
+            "markdown_to_list": lambda a: _wrap_list_result(
+                markdown_to_list(**_pick(a, ["content", "file_path"]))
             ),
         }
 
