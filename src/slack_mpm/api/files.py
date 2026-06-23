@@ -56,6 +56,10 @@ async def upload_file(
     """
     import httpx
 
+    # Guard: channels must be non-empty
+    if not channels:
+        raise ValueError("upload_file: channels list must not be empty")
+
     # Resolve content bytes
     if content is not None and file_path is not None:
         raise ValueError("upload_file: provide either content or file_path, not both")
@@ -112,7 +116,7 @@ async def upload_file(
         # Pass all channels to completeUploadExternal (max 100 per Slack docs)
         complete_payload["channels"] = channels
     else:
-        complete_payload["channel_id"] = channels[0] if channels else ""
+        complete_payload["channel_id"] = channels[0]
 
     if thread_ts is not None:
         complete_payload["thread_ts"] = thread_ts

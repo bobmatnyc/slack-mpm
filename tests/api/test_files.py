@@ -107,6 +107,15 @@ async def test_upload_file_from_path(
 
 
 @pytest.mark.asyncio
+async def test_upload_file_empty_channels_raises() -> None:
+    """upload_file raises ValueError if channels list is empty."""
+    from slack_mpm.api.files import upload_file
+
+    with pytest.raises(ValueError, match="must not be empty"):
+        await upload_file("xoxb-token", [], content="text", filename="test.txt")
+
+
+@pytest.mark.asyncio
 async def test_upload_file_both_content_and_path_raises() -> None:
     """upload_file raises ValueError if both content and file_path are provided."""
     from slack_mpm.api.files import upload_file

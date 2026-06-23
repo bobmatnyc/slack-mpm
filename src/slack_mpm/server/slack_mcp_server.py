@@ -591,7 +591,7 @@ SLACK_TOOLS: list[types.Tool] = [
         name="upload_file",
         description=(
             "Upload a file to one or more Slack channels. "
-            "Provide either 'content' (text or binary base64) or 'file_path' (disk path), not both."
+            "Provide either 'content' (UTF-8 text only) or 'file_path' (disk path for binary or text files), not both."  # noqa: E501
         ),
         inputSchema={
             "type": "object",

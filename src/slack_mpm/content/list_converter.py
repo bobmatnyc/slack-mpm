@@ -24,7 +24,6 @@ def _parse_table_rows(lines: list[str]) -> list[dict[str, Any]]:
     Test: Pass a valid 2-column table, assert rows returned with correct values.
     """
     items: list[dict[str, Any]] = []
-    header: list[str] = []
     parsing_header = True
 
     for line in lines:
@@ -40,13 +39,9 @@ def _parse_table_rows(lines: list[str]) -> list[dict[str, Any]]:
         cells = [c.strip() for c in stripped.strip("|").split("|")]
 
         if parsing_header:
-            header = cells
             parsing_header = False
         else:
-            if header:
-                value = " | ".join(cells)
-            else:
-                value = " | ".join(cells)
+            value = " | ".join(cells)
             if value.strip():
                 items.append({"value": value})
 
