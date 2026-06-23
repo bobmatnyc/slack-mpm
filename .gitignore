@@ -14,6 +14,17 @@ htmlcov/
 archive/
 *.pstats
 
-# Claude MPM
-.claude-mpm/PM_INSTRUCTIONS.md
-.claude-mpm/PM_INSTRUCTIONS.md.meta
+# Claude Code & MPM runtime artifacts
+.claude-mpm/PM_INSTRUCTIONS*.md
+.claude-mpm/PM_INSTRUCTIONS*.meta
+.claude-mpm/config.json
+.claude-mpm/memories/
+.claude-mpm/templates/
+.claude/
+.kuzu-memory/
+.kuzu-memory-backups/
+.mcp.json
+.mcp.local.json*
+.trusty-search/
+.mcp-vector-search/
+.DS_Store
