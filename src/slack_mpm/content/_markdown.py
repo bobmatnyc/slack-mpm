@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from markdown_it import MarkdownIt  # type: ignore[import-not-found]
+from markdown_it import MarkdownIt
 
 
 def make_parser() -> MarkdownIt:
