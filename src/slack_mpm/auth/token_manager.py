@@ -34,7 +34,16 @@ def _load_env() -> None:
     Search stops as soon as SLACK_BOT_TOKEN is present in os.environ (the only
     required credential). SLACK_USER_TOKEN is optional and never blocks early
     exit. Duplicate candidate paths are skipped automatically.
+
+    Opt-out: set SLACK_MPM_DISABLE_DOTENV=1 in the environment to skip the
+    entire walk entirely (useful for test runners and other embedders that
+    manage their own environment). Default production behavior is unchanged
+    when the variable is absent or set to any value other than "1".
     """
+    # Honour the opt-out flag: skip the walk entirely when set.
+    if os.environ.get("SLACK_MPM_DISABLE_DOTENV") == "1":
+        return
+
     # Build the ordered, deduplicated list of candidate directories.
     candidates: list[Path] = []
     seen: set[Path] = set()
