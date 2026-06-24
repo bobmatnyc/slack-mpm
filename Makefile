@@ -364,8 +364,8 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
 	elif [ "$$HTTP_STATUS" != "404" ]; then \
-		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
-		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		echo "$(RED)Error: Could not verify PyPI state (HTTP $$HTTP_STATUS) — aborting before any changes.$(NC)"; \
+		echo "$(YELLOW)It is safe to re-run make publish once connectivity is restored.$(NC)"; \
 		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
@@ -382,21 +382,33 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 		# Commit+tag LOCALLY first, then push. \
 		# If git push fails: repo has a clean local commit+tag; recovery = git push && git push --tags. \
 		# Do NOT re-run make publish — the PyPI 200 guard will correctly block it. \
-		git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
-		git commit -m "chore: bump version to $$NEW_VERSION" && \
-		git tag "v$$NEW_VERSION" && \
-		git push && git push --tags && \
-		echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
-		if command -v gh >/dev/null 2>&1; then \
-			gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
-				&& echo "$(GREEN)GitHub Release created$(NC)" \
-				|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+		if git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
+		   git commit -m "chore: bump version to $$NEW_VERSION" && \
+		   git tag "v$$NEW_VERSION" && \
+		   git push && git push --tags; then \
+			echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
+			if command -v gh >/dev/null 2>&1; then \
+				gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
+					&& echo "$(GREEN)GitHub Release created$(NC)" \
+					|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+			else \
+				echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			fi; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
+			echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 		else \
-			echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			echo "$(RED)PyPI publish SUCCEEDED but git commit/tag/push FAILED.$(NC)"; \
+			echo "$(RED)The package v$$NEW_VERSION is live on PyPI.$(NC)"; \
+			echo "$(YELLOW)Do NOT re-run make publish — the idempotency guard will block it (version already on PyPI).$(NC)"; \
+			echo "$(YELLOW)Recover manually:$(NC)"; \
+			echo "$(YELLOW)  git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock$(NC)"; \
+			echo "$(YELLOW)  git commit -m 'chore: bump version to $$NEW_VERSION'$(NC)"; \
+			echo "$(YELLOW)  git tag v$$NEW_VERSION$(NC)"; \
+			echo "$(YELLOW)  git push && git push --tags$(NC)"; \
+			echo "$(YELLOW)  gh release create v$$NEW_VERSION --title v$$NEW_VERSION --generate-notes dist/*$(NC)"; \
+			exit 1; \
 		fi; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
-		echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 	else \
 		echo "$(RED)PyPI publish FAILED. Reverting version files to restore clean tree...$(NC)"; \
 		git checkout -- VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
@@ -434,8 +446,8 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
 	elif [ "$$HTTP_STATUS" != "404" ]; then \
-		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
-		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		echo "$(RED)Error: Could not verify PyPI state (HTTP $$HTTP_STATUS) — aborting before any changes.$(NC)"; \
+		echo "$(YELLOW)It is safe to re-run make publish once connectivity is restored.$(NC)"; \
 		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
@@ -452,21 +464,33 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 		# Commit+tag LOCALLY first, then push. \
 		# If git push fails: repo has a clean local commit+tag; recovery = git push && git push --tags. \
 		# Do NOT re-run make publish — the PyPI 200 guard will correctly block it. \
-		git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
-		git commit -m "chore: bump version to $$NEW_VERSION" && \
-		git tag "v$$NEW_VERSION" && \
-		git push && git push --tags && \
-		echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
-		if command -v gh >/dev/null 2>&1; then \
-			gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
-				&& echo "$(GREEN)GitHub Release created$(NC)" \
-				|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+		if git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
+		   git commit -m "chore: bump version to $$NEW_VERSION" && \
+		   git tag "v$$NEW_VERSION" && \
+		   git push && git push --tags; then \
+			echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
+			if command -v gh >/dev/null 2>&1; then \
+				gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
+					&& echo "$(GREEN)GitHub Release created$(NC)" \
+					|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+			else \
+				echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			fi; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
+			echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 		else \
-			echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			echo "$(RED)PyPI publish SUCCEEDED but git commit/tag/push FAILED.$(NC)"; \
+			echo "$(RED)The package v$$NEW_VERSION is live on PyPI.$(NC)"; \
+			echo "$(YELLOW)Do NOT re-run make publish — the idempotency guard will block it (version already on PyPI).$(NC)"; \
+			echo "$(YELLOW)Recover manually:$(NC)"; \
+			echo "$(YELLOW)  git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock$(NC)"; \
+			echo "$(YELLOW)  git commit -m 'chore: bump version to $$NEW_VERSION'$(NC)"; \
+			echo "$(YELLOW)  git tag v$$NEW_VERSION$(NC)"; \
+			echo "$(YELLOW)  git push && git push --tags$(NC)"; \
+			echo "$(YELLOW)  gh release create v$$NEW_VERSION --title v$$NEW_VERSION --generate-notes dist/*$(NC)"; \
+			exit 1; \
 		fi; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
-		echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 	else \
 		echo "$(RED)PyPI publish FAILED. Reverting version files to restore clean tree...$(NC)"; \
 		git checkout -- VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
@@ -503,8 +527,8 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
 	elif [ "$$HTTP_STATUS" != "404" ]; then \
-		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
-		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		echo "$(RED)Error: Could not verify PyPI state (HTTP $$HTTP_STATUS) — aborting before any changes.$(NC)"; \
+		echo "$(YELLOW)It is safe to re-run make publish once connectivity is restored.$(NC)"; \
 		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
@@ -521,21 +545,33 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 		# Commit+tag LOCALLY first, then push. \
 		# If git push fails: repo has a clean local commit+tag; recovery = git push && git push --tags. \
 		# Do NOT re-run make publish — the PyPI 200 guard will correctly block it. \
-		git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
-		git commit -m "chore: bump version to $$NEW_VERSION" && \
-		git tag "v$$NEW_VERSION" && \
-		git push && git push --tags && \
-		echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
-		if command -v gh >/dev/null 2>&1; then \
-			gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
-				&& echo "$(GREEN)GitHub Release created$(NC)" \
-				|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+		if git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock && \
+		   git commit -m "chore: bump version to $$NEW_VERSION" && \
+		   git tag "v$$NEW_VERSION" && \
+		   git push && git push --tags; then \
+			echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
+			if command -v gh >/dev/null 2>&1; then \
+				gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
+					&& echo "$(GREEN)GitHub Release created$(NC)" \
+					|| echo "$(YELLOW)GitHub Release skipped$(NC)"; \
+			else \
+				echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			fi; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
+			echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
+			echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 		else \
-			echo "$(YELLOW)gh CLI not found - skipping GitHub Release$(NC)"; \
+			echo "$(RED)PyPI publish SUCCEEDED but git commit/tag/push FAILED.$(NC)"; \
+			echo "$(RED)The package v$$NEW_VERSION is live on PyPI.$(NC)"; \
+			echo "$(YELLOW)Do NOT re-run make publish — the idempotency guard will block it (version already on PyPI).$(NC)"; \
+			echo "$(YELLOW)Recover manually:$(NC)"; \
+			echo "$(YELLOW)  git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock$(NC)"; \
+			echo "$(YELLOW)  git commit -m 'chore: bump version to $$NEW_VERSION'$(NC)"; \
+			echo "$(YELLOW)  git tag v$$NEW_VERSION$(NC)"; \
+			echo "$(YELLOW)  git push && git push --tags$(NC)"; \
+			echo "$(YELLOW)  gh release create v$$NEW_VERSION --title v$$NEW_VERSION --generate-notes dist/*$(NC)"; \
+			exit 1; \
 		fi; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
-		echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
-		echo "$(GREEN)═══════════════════════════════════════════$(NC)"; \
 	else \
 		echo "$(RED)PyPI publish FAILED. Reverting version files to restore clean tree...$(NC)"; \
 		git checkout -- VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
