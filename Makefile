@@ -356,6 +356,10 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
+	elif [ "$$HTTP_STATUS" != "404" ]; then \
+		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
+		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
@@ -364,8 +368,13 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
+	# uv publish uses --check-url (not --skip-existing) to skip duplicate uploads. \
+	# Requires uv >= 0.4.x (installed: uv 0.11.16). \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/; \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	# Commit+tag LOCALLY first, then push. If push fails, repo has a clean local \
+	# commit+tag and recovery is: git push && git push --tags (NOT make publish). \
+	# The idempotency guard above will block a re-run since the version is on PyPI. \
 	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
 	git commit -m "chore: bump version to $$NEW_VERSION"; \
 	git tag "v$$NEW_VERSION"; \
@@ -404,6 +413,10 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
+	elif [ "$$HTTP_STATUS" != "404" ]; then \
+		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
+		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
@@ -412,8 +425,13 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
+	# uv publish uses --check-url (not --skip-existing) to skip duplicate uploads. \
+	# Requires uv >= 0.4.x (installed: uv 0.11.16). \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/; \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	# Commit+tag LOCALLY first, then push. If push fails, repo has a clean local \
+	# commit+tag and recovery is: git push && git push --tags (NOT make publish). \
+	# The idempotency guard above will block a re-run since the version is on PyPI. \
 	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
 	git commit -m "chore: bump version to $$NEW_VERSION"; \
 	git tag "v$$NEW_VERSION"; \
@@ -451,6 +469,10 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
 		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
 		exit 1; \
+	elif [ "$$HTTP_STATUS" != "404" ]; then \
+		echo "$(RED)Error: PyPI check returned unexpected status $$HTTP_STATUS — aborting for safety.$(NC)"; \
+		echo "$(YELLOW)Check your network connection or retry. Do NOT re-run make publish if unsure about PyPI state.$(NC)"; \
+		exit 1; \
 	fi; \
 	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
@@ -459,8 +481,13 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
+	# uv publish uses --check-url (not --skip-existing) to skip duplicate uploads. \
+	# Requires uv >= 0.4.x (installed: uv 0.11.16). \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/; \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	# Commit+tag LOCALLY first, then push. If push fails, repo has a clean local \
+	# commit+tag and recovery is: git push && git push --tags (NOT make publish). \
+	# The idempotency guard above will block a re-run since the version is on PyPI. \
 	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
 	git commit -m "chore: bump version to $$NEW_VERSION"; \
 	git tag "v$$NEW_VERSION"; \
