@@ -272,7 +272,10 @@ pre-publish: lint test ## Run quality checks before publishing
 	@echo ""
 	@echo "$(YELLOW)Checking working directory...$(NC)"
 	@if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then \
-		echo "$(YELLOW)Warning: Working directory has uncommitted changes$(NC)"; \
+		echo "$(RED)Error: Working directory has uncommitted changes. Commit or stash all changes before publishing.$(NC)"; \
+		echo "$(YELLOW)Dirty files:$(NC)"; \
+		git status --porcelain 2>/dev/null; \
+		exit 1; \
 	else \
 		echo "$(GREEN)Working directory is clean.$(NC)"; \
 	fi
@@ -342,19 +345,32 @@ publish: ## Bump patch + build + publish to PyPI + GitHub Release
 	NEW_PATCH=$$((PATCH + 1)); \
 	NEW_VERSION="$$MAJOR.$$MINOR.$$NEW_PATCH"; \
 	echo "$(YELLOW)Version: $$CURRENT -> $$NEW_VERSION$(NC)"; \
+	echo "$(YELLOW)Idempotency check: verifying v$$NEW_VERSION is not already released...$(NC)"; \
+	if git tag | grep -q "^v$$NEW_VERSION$$"; then \
+		echo "$(RED)Error: git tag v$$NEW_VERSION already exists. The version has already been released or bumped.$(NC)"; \
+		echo "$(YELLOW)If the publish failed mid-flight, use 'make publish-only' to retry publishing the current version.$(NC)"; \
+		exit 1; \
+	fi; \
+	HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/slack-mpm/$$NEW_VERSION/json"); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
+		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
 	$(MAKE) sync-versions; \
-	git add VERSION pyproject.toml; \
-	git commit -m "chore: bump version to $$NEW_VERSION"; \
-	git tag "v$$NEW_VERSION"; \
-	git push && git push --tags; \
-	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	$(MAKE) build; \
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	git tag "v$$NEW_VERSION"; \
+	git push && git push --tags; \
+	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
 			&& echo "$(GREEN)GitHub Release created$(NC)" \
@@ -377,19 +393,32 @@ publish-minor: ## Bump minor + build + publish to PyPI + GitHub Release
 	NEW_MINOR=$$((MINOR + 1)); \
 	NEW_VERSION="$$MAJOR.$$NEW_MINOR.0"; \
 	echo "$(YELLOW)Version: $$CURRENT -> $$NEW_VERSION$(NC)"; \
+	echo "$(YELLOW)Idempotency check: verifying v$$NEW_VERSION is not already released...$(NC)"; \
+	if git tag | grep -q "^v$$NEW_VERSION$$"; then \
+		echo "$(RED)Error: git tag v$$NEW_VERSION already exists. The version has already been released or bumped.$(NC)"; \
+		echo "$(YELLOW)If the publish failed mid-flight, use 'make publish-only' to retry publishing the current version.$(NC)"; \
+		exit 1; \
+	fi; \
+	HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/slack-mpm/$$NEW_VERSION/json"); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
+		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
 	$(MAKE) sync-versions; \
-	git add VERSION pyproject.toml; \
-	git commit -m "chore: bump version to $$NEW_VERSION"; \
-	git tag "v$$NEW_VERSION"; \
-	git push && git push --tags; \
-	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	$(MAKE) build; \
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	git tag "v$$NEW_VERSION"; \
+	git push && git push --tags; \
+	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
 			&& echo "$(GREEN)GitHub Release created$(NC)" \
@@ -411,19 +440,32 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 	NEW_MAJOR=$$((MAJOR + 1)); \
 	NEW_VERSION="$$NEW_MAJOR.0.0"; \
 	echo "$(YELLOW)Version: $$CURRENT -> $$NEW_VERSION$(NC)"; \
+	echo "$(YELLOW)Idempotency check: verifying v$$NEW_VERSION is not already released...$(NC)"; \
+	if git tag | grep -q "^v$$NEW_VERSION$$"; then \
+		echo "$(RED)Error: git tag v$$NEW_VERSION already exists. The version has already been released or bumped.$(NC)"; \
+		echo "$(YELLOW)If the publish failed mid-flight, use 'make publish-only' to retry publishing the current version.$(NC)"; \
+		exit 1; \
+	fi; \
+	HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/slack-mpm/$$NEW_VERSION/json"); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo "$(RED)Error: v$$NEW_VERSION already exists on PyPI. The version has already been published.$(NC)"; \
+		echo "$(YELLOW)Bump the version manually or increment to a fresh version number.$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Idempotency check passed: v$$NEW_VERSION is a fresh release.$(NC)"; \
 	echo "$$NEW_VERSION" > VERSION; \
 	$(MAKE) sync-versions; \
-	git add VERSION pyproject.toml; \
-	git commit -m "chore: bump version to $$NEW_VERSION"; \
-	git tag "v$$NEW_VERSION"; \
-	git push && git push --tags; \
-	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	$(MAKE) build; \
 	PYPI_TOKEN=""; \
 	if [ -f .env.local ]; then . .env.local; fi; \
 	if [ -z "$${PYPI_TOKEN:-}" ] && [ -f ../gworkspace-mcp/.env.local ]; then . ../gworkspace-mcp/.env.local; fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
 	echo "$(GREEN)Published to PyPI$(NC)"; \
+	git add VERSION pyproject.toml src/slack_mpm/__version__.py uv.lock; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	git tag "v$$NEW_VERSION"; \
+	git push && git push --tags; \
+	echo "$(GREEN)Committed, tagged, pushed$(NC)"; \
 	if command -v gh >/dev/null 2>&1; then \
 		gh release create "v$$NEW_VERSION" --title "v$$NEW_VERSION" --generate-notes dist/* \
 			&& echo "$(GREEN)GitHub Release created$(NC)" \
@@ -435,7 +477,7 @@ publish-major: ## Bump major + build + publish to PyPI + GitHub Release
 	echo "$(GREEN)  Published slack-mpm $$NEW_VERSION$(NC)"; \
 	echo "$(GREEN)═══════════════════════════════════════════$(NC)"
 
-publish-only: ## Publish current version to PyPI (no version bump)
+publish-only: ## Publish current version to PyPI (no version bump, safe to retry)
 	@echo "$(BLUE)Publishing current version to PyPI...$(NC)"
 	@$(MAKE) build
 	@PYPI_TOKEN=""; \
@@ -445,5 +487,5 @@ publish-only: ## Publish current version to PyPI (no version bump)
 		echo "$(RED)Error: PYPI_TOKEN not found$(NC)"; \
 		exit 1; \
 	fi; \
-	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish && \
+	UV_PUBLISH_TOKEN="$$PYPI_TOKEN" uv publish --check-url https://pypi.org/simple/ && \
 	echo "$(GREEN)Published to PyPI$(NC)"
